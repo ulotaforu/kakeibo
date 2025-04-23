@@ -1,0 +1,33 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.node
+      target: dev
+    working_dir: /kakeibo
+    volumes:
+      - type: bind
+        source: ./
+        target: /kakeibo
+      # wrangler の永続化
+      - type: bind
+        source: ~/.config
+        target: /home/node/.config
+      - type: bind
+        source: ./docker/.bashrc
+        target: /home/node/.bashrc
+      # # bash 履歴の永続化
+      # - type: bind
+      #   source: ./tmp/.bash_history
+      #   target: /home/node/.bash_history
+      # - type: bind
+      #   source: /tmp/.X11-unix
+      #   target: /tmp/.X11-unix
+    ports:
+      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:4983:4983'
+    # network_mode: host
+    environment:
+      LANG: ja_JP.UTF-8
+      LC_CTYPE: ja_JP.UTF-8
+    tty: true

@@ -1,0 +1,66 @@
+FROM node:22.11.0-slim AS node
+
+FROM node AS dev
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+
+RUN \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt update
+
+# vimで日本語打てない問題
+RUN  \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt install -y --no-install-recommends locales \
+  && sed -i '/ja_JP.UTF-8/s/^# //g' /etc/locale.gen \
+  && locale-gen \
+  && update-locale LANG=ja_JP.UTF-8
+ENV LANG=ja_JP.UTF-8
+ENV LC_ALL=ja_JP.UTF-8
+
+
+RUN \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  apt install -y --no-install-recommends git vim make less ssh curl libatomic1 ca-certificates
+
+RUN \
+  --mount=type=cache,target=/var/lib/apt,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  update-ca-certificates
+
+
+
+ARG PNPM_VERSION=10.6.3
+RUN npm install -g pnpm@${PNPM_VERSION}
+
+USER node
+
+RUN pnpm completion bash > ~/completion-for-pnpm.bash
+
+# # Import the repository signing key:
+# RUN \
+#   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+#   --mount=type=cache,target=/var/cache/apt,sharing=locked \
+#   apt install -y --no-install-recommends curl ca-certificates
+# RUN install -d /usr/share/postgresql-common/pgdg
+# RUN curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
+
+# # Create the repository configuration file:
+# RUN sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+
+# # Update the package lists:
+# RUN \
+#   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+#   --mount=type=cache,target=/var/cache/apt,sharing=locked \
+#   apt update -y
+
+# # Install the latest version of PostgreSQL:
+# # If you want a specific version, use 'postgresql-16' or similar instead of 'postgresql'
+# RUN \
+#   --mount=type=cache,target=/var/lib/apt,sharing=locked \
+#   --mount=type=cache,target=/var/cache/apt,sharing=locked \
+#   apt -y install postgresql-client-17
