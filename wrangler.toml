@@ -1,8 +1,14 @@
 #:schema node_modules/wrangler/config-schema.json
-name = "example-cloudflare-workers"
+name = "kakeibo"
 compatibility_date = "2024-11-06"
 main = "./worker.ts"
 assets = { directory = "./build/client" }
 
 [vars]
 MY_VAR = "My Value"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kakeibo_db"
+database_id = "58579d0a-ec3d-4887-a5c8-44c084869dfe"
+migrations_dir = "server/drizzle"
