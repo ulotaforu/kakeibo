@@ -3,3 +3,4 @@ node_modules
 .react-router
 .wrangler
 .env
+.dev.vars
