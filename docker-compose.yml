@@ -24,8 +24,8 @@ services:
       #   source: /tmp/.X11-unix
       #   target: /tmp/.X11-unix
     ports:
-      - '127.0.0.1:3000:3000'
-      - '127.0.0.1:4983:4983'
+      - '3000:3000'
+      - '4983:4983'
     # network_mode: host
     environment:
       LANG: ja_JP.UTF-8
