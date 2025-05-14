@@ -1,9 +1,11 @@
 import type { Context } from "hono";
+import type { HonoContext } from "server";
 import type { PlatformProxy } from "wrangler";
 
 type Env = {
 	Bindings: {
 		MY_VAR: string;
+		DB: D1Database;
 	};
 	Variables: {
 		MY_VAR_IN_VARIABLES: string;
@@ -21,7 +23,7 @@ type GetLoadContextArgs = {
 			cf: Request["cf"];
 		};
 		hono: {
-			context: Context<Env>;
+			context: HonoContext;
 		};
 	};
 };
