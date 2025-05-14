@@ -1,5 +1,6 @@
 services:
   dev:
+    user: node
     build:
       context: .
       dockerfile: docker/Dockerfile.node
@@ -11,7 +12,7 @@ services:
         target: /kakeibo
       # wrangler の永続化
       - type: bind
-        source: ~/.config
+        source: /home/node/wrangler-data
         target: /home/node/.config
       - type: bind
         source: ./docker/.bashrc
