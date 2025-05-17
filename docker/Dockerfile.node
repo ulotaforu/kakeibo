@@ -32,35 +32,38 @@ RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   update-ca-certificates
 
+# SSH設定
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-server \
+    && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /var/run/sshd /run/sshd
+
+# sshd_config を Dockerfile から直接書き込む
+RUN echo "Port 2222" > /etc/ssh/sshd_config && \
+    echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
+    echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
+    echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config && \
+    echo "AuthorizedKeysFile .ssh/authorized_keys" >> /etc/ssh/sshd_config && \
+    echo "ChallengeResponseAuthentication no" >> /etc/ssh/sshd_config && \
+    # echo "UsePAM no" >> /etc/ssh/sshd_config
+# nodeユーザーのロック解除＆パスワード削除
+RUN usermod -U node || passwd -u node || true
+RUN passwd -d node || true
 
 ARG PNPM_VERSION=10.6.3
 RUN npm install -g pnpm@${PNPM_VERSION}
 
-USER node
+# Create pnpm completion in node user's home directory
+RUN mkdir -p /home/node/.config/pnpm
+RUN pnpm completion bash > /home/node/.config/pnpm/completion.bash
+RUN echo 'source /home/node/.config/pnpm/completion.bash' >> /home/node/.bashrc
 
-RUN pnpm completion bash > ~/completion-for-pnpm.bash
-
-# # Import the repository signing key:
-# RUN \
-#   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-#   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-#   apt install -y --no-install-recommends curl ca-certificates
-# RUN install -d /usr/share/postgresql-common/pgdg
-# RUN curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-
-# # Create the repository configuration file:
-# RUN sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-
-# # Update the package lists:
-# RUN \
-#   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-#   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-#   apt update -y
-
-# # Install the latest version of PostgreSQL:
-# # If you want a specific version, use 'postgresql-16' or similar instead of 'postgresql'
-# RUN \
-#   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-#   --mount=type=cache,target=/var/cache/apt,sharing=locked \
-#   apt -y install postgresql-client-17
+# CMD で公開鍵設定と sshd 起動（環境変数から渡す）
+CMD bash -c "\
+    mkdir -p /home/node/.ssh && \
+    echo \"\$SSH_PUB_KEY\" > /home/node/.ssh/authorized_keys && \
+    chown -R node:node /home/node/.ssh && \
+    chmod 700 /home/node/.ssh && \
+    chmod 600 /home/node/.ssh/authorized_keys && \
+    /usr/sbin/sshd -D"

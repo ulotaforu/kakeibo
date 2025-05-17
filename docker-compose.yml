@@ -1,6 +1,5 @@
 services:
   dev:
-    user: node
     build:
       context: .
       dockerfile: docker/Dockerfile.node
@@ -17,18 +16,11 @@ services:
       - type: bind
         source: ./docker/.bashrc
         target: /home/node/.bashrc
-      # # bash 履歴の永続化
-      # - type: bind
-      #   source: ./tmp/.bash_history
-      #   target: /home/node/.bash_history
-      # - type: bind
-      #   source: /tmp/.X11-unix
-      #   target: /tmp/.X11-unix
     ports:
       - '3000:3000'
       - '4983:4983'
-    # network_mode: host
+      - '2222:2222'
     environment:
       LANG: ja_JP.UTF-8
       LC_CTYPE: ja_JP.UTF-8
-    tty: true
+      SSH_PUB_KEY: ${SSH_PUB_KEY}
