@@ -3,6 +3,7 @@ name = "kakeibo"
 compatibility_date = "2024-11-06"
 main = "./worker.ts"
 assets = { directory = "./build/client" }
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 MY_VAR = "My Value"
