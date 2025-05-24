@@ -2,36 +2,33 @@ import {
 	Button,
 	Container,
 	Flex,
-	Grid,
 	Heading,
 	Text,
 	TextField,
 } from "@radix-ui/themes";
-import { signIn, signOut } from "@hono/auth-js/react";
+import { signOut } from "@hono/auth-js/react";
 import type { Route } from "./+types/signup";
 import { checkUser } from "~/lib/auth/session";
 import { Form, redirect, useActionData } from "react-router";
-import type React from "react";
-import { SignUpMessages, SignUpSchema } from "~/lib/validation";
-import { useState } from "react";
-import { parse } from "valibot";
+import { SignUpSchema } from "~/lib/validation";
+import { useForm } from "@conform-to/react";
+import { parseWithValibot } from "@conform-to/valibot";
+import { drizzle } from "drizzle-orm/d1";
+import { usersTable } from "server/db/schema";
 
-export const action = async ({ request }: { request: Request }) => {
+export const action = async ({ request, context }: Route.ActionArgs) => {
 	const formData = await request.formData();
-	const data = Object.fromEntries(formData.entries());
-	try {
-		const result = parse(SignUpSchema, data);
-		console.log(result);
-		console.log(data);
-		// TODO: DBにユーザーを登録する
-		return { sucess: true };
-	} catch (error) {
-		const errors: Record<string, string> = {};
-		for (const [field, issues] of Object.entries(error.issues)) {
-			errors[field] = issues[0].message;
-		}
-		return { sucess: false, errors, values: data };
+	const submission = parseWithValibot(formData, { schema: SignUpSchema });
+	if (submission.status !== "success") {
+		return submission.reply();
 	}
+	const db = drizzle(context.cloudflare.env.DB);
+	// ユーザー登録
+	await db.insert(usersTable).values({
+		email: submission.value.email,
+		name: submission.value.name,
+	});
+	return redirect("/home");
 };
 
 export const loader = async ({ context }: Route.LoaderArgs) => {
@@ -46,66 +43,76 @@ export const loader = async ({ context }: Route.LoaderArgs) => {
 };
 
 export default function Index({ loaderData }: Route.ComponentProps) {
-	const actionData = useActionData();
-	const [errors, setErrors] = useState<Record<string, string>>({});
+	const lastResult = useActionData();
 	const { email } = loaderData;
-
-	const submitHandler = (e: React.FormEvent<HTMLFormElement>) => {
-		const form = e.currentTarget;
-		const formData = new FormData(form);
-		const name = (formData.get("name") || "").toString().trim();
-		const email = (formData.get("email") || "").toString().trim();
-		const errors: Record<string, string> = {};
-		if (name.length < 1) {
-			errors.name = SignUpMessages.name;
-		}
-		if (email.length === 0) {
-			errors.email = SignUpMessages.email.empty;
-		}
-		if (Object.keys(errors).length > 0) {
-			e.preventDefault();
-			setErrors(errors);
-		}
-	};
+	const [form, fields] = useForm({
+		lastResult,
+		shouldValidate: "onSubmit",
+		shouldRevalidate: "onSubmit",
+		onValidate({ formData }) {
+			return parseWithValibot(formData, { schema: SignUpSchema });
+		},
+	});
 
 	return (
 		<Container size={"3"} pt={"4"}>
 			<Heading size={"4"} align={"center"}>
-				ユーザー登録
+				Sign Up
 			</Heading>
-			<Flex align={"center"} justify={"center"} direction={"column"}>
-				<Grid gap={"1"}>
-					<Form method="post" onSubmit={submitHandler}>
-						<Text>サインイン中のメールアドレス</Text>
+			<Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate>
+				<Flex
+					direction="column"
+					gap="4"
+					style={{ maxWidth: "200px", width: "100%", margin: "0 auto" }}
+				>
+					<Flex direction="column" gap="1" mt="2">
+						<Text as="label" size="2" weight="bold">
+							サインイン中のメールアドレス
+						</Text>
 						<TextField.Root
 							variant="surface"
-							name="email"
+							key={fields.email.key}
+							name={fields.email.name}
 							value={email}
 							readOnly
 						/>
-						{errors.email && <Text color="red">{errors.email}</Text>}
-						{actionData?.error?.email && (
-							<Text color="red">{actionData.error.email}</Text>
+						{fields.email.errors && (
+							<Text size="1" color="red">
+								{fields.email.errors}
+							</Text>
 						)}
-						<br />
-						<Text>あなたの名前を教えてください</Text>
-						<TextField.Root variant="surface" name="name" />
-						{errors.name && <Text color="red">{errors.name}</Text>}
-						{actionData?.error?.name && (
-							<Text color="red">{actionData.error.name}</Text>
+					</Flex>
+					<Flex direction="column" gap="1">
+						<Text as="label" size="2" weight="bold">
+							あなたの名前を教えてください
+						</Text>
+						<TextField.Root
+							variant="surface"
+							name={fields.name.name}
+							key={fields.name.key}
+						/>
+						{fields.name.errors && (
+							<Text size="1" color="red">
+								{fields.name.errors}
+							</Text>
 						)}
+					</Flex>
+					<Flex direction="column" gap="2">
 						<Button variant="surface" type="submit">
-							送信
+							登録
 						</Button>
 						<Button
-							variant="surface"
-							onClick={() => signOut({ callbackUrl: "/" })}
+							variant="soft"
+							onClick={(e) => {
+								e.preventDefault();
+								signOut({ callbackUrl: "/" });
+							}}
 						>
 							登録をやめる
 						</Button>
-					</Form>
-				</Grid>
-			</Flex>
+					</Flex>
+				</Flex>
+			</Form>
 		</Container>
 	);
 }
