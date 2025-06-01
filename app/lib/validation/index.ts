@@ -15,3 +15,10 @@ export const SignUpSchema = object({
 		nonEmpty(SignUpMessages.email.empty),
 	),
 });
+
+export const NewHouseholdMessages = {
+	name: "家計簿名を入力してください",
+};
+export const NewHouseholdSchema = object({
+	name: string(NewHouseholdMessages.name),
+});
