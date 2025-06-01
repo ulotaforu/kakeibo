@@ -15,6 +15,7 @@ const Authenticated = object({
 	state: literal("authenticated"),
 	email: string(),
 	name: string(),
+	userId: string(),
 });
 const AuthStatesSchema = union([Unauthorized, Registering, Authenticated]);
 export type AuthStatesType = InferInput<typeof AuthStatesSchema>;
@@ -33,7 +34,10 @@ export const checkUser = async (
 		const db = drizzle(context.env.DB);
 
 		const result = await db
-			.select({ name: usersTable.name })
+			.select({ 
+				id: usersTable.id,
+				name: usersTable.name 
+			})
 			.from(usersTable)
 			.where(eq(usersTable.email, email));
 
@@ -48,9 +52,10 @@ export const checkUser = async (
 		}
 
 		return {
-			state: "authenticated",
+			state: "authenticated" as const,
 			email,
 			name: user.name,
+			userId: user.id,
 		};
 	} catch (error) {
 		return { state: "unauthorized" };
