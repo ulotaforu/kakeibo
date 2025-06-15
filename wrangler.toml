@@ -13,6 +13,3 @@ binding = "DB"
 database_name = "kakeibo_db"
 database_id = "58579d0a-ec3d-4887-a5c8-44c084869dfe"
 migrations_dir = "server/drizzle"
-
-[site]
-bucket = "./build/client"
