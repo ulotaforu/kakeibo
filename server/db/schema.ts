@@ -152,3 +152,32 @@ export const settlementsTable = sqliteTable("settlements", {
 	status: integer("is_expense", { mode: "boolean" }).notNull().default(true),
 	paid_at: text("paid_at").notNull(),
 });
+
+export const householdInvitationsTable = sqliteTable("household_invitations", {
+	id: text("id")
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	household_id: text("household_id")
+		.notNull()
+		.references(() => householdsTable.id),
+	inviter_id: text("inviter_id")
+		.notNull()
+		.references(() => usersTable.id),
+	invitee_email: text("invitee_email").notNull(),
+	invitee_id: text("invitee_id").references(() => usersTable.id), // NULL 可
+	status: integer("status")
+		.notNull()
+		.default(0), // 0: pending / 1: accepted / 2: declined / 3: expired
+	token: text("token").notNull().unique(),
+	sent_at: text("sent_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	responded_at: text("responded_at"),
+	created_at: text("created_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString()),
+	updated_at: text("updated_at")
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+		.$onUpdateFn(() => new Date().toISOString()),
+});
