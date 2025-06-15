@@ -15,7 +15,7 @@ import { checkUser } from "~/lib/auth/session";
 import { Form, redirect, useActionData, Link } from "react-router";
 import type { Route } from "./+types/home";
 import { drizzle } from "drizzle-orm/d1";
-import { householdsTable, householdUsersTable } from "server/db/schema";
+import { householdsTable, householdUsersTable, categoriesTable, tagsTable } from "server/db/schema";
 import { useForm } from "@conform-to/react";
 import { parseWithValibot } from "@conform-to/valibot";
 import { NewHouseholdSchema } from "~/lib/validation";
@@ -35,6 +35,38 @@ export const action = async ({ request, context }: Route.ActionArgs) => {
 		})
 		.returning();
 	const householdId = household.id;
+
+	// デフォルトカテゴリを挿入
+	const defaultCategories = [
+		// 支出
+		"食費",
+		"日用品・消耗品",
+		"交通費・移動",
+		"住居費",
+		"水道光熱費",
+		"通信費",
+		"医療・保険",
+		"教育・学習",
+		"娯楽・趣味",
+		"衣服・美容",
+		"交際費・プレゼント",
+		"税金・社会保険",
+		"その他",
+	].map((name) => ({ name, household_id: householdId, is_expense: true })).concat(
+		[
+			"給与・賞与",
+			"副収入",
+			"投資・配当",
+			"その他収入",
+		].map((name) => ({ name, household_id: householdId, is_expense: false }))
+	);
+
+	await db.insert(categoriesTable).values(defaultCategories);
+
+	// デフォルトタグを挿入
+	const defaultTags = ["必要", "不必要"].map((name) => ({ name, household_id: householdId }));
+	await db.insert(tagsTable).values(defaultTags);
+
 	const user = await checkUser(context.hono.context);
 	if (user.state !== "authenticated") {
 		return redirect("/signup");
@@ -100,9 +132,12 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 			>
 				{households.map((household) => (
 					<Link
-						key={household.id}
 						to={`/household/${household.id}`}
-						style={{ textDecoration: "none" }}
+						key={household.id}
+						style={{
+							textDecoration: "none",
+							color: "inherit",
+						}}
 					>
 						<Box style={{ height: "100%" }}>
 							<Card
@@ -110,6 +145,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 									height: "100%",
 									display: "flex",
 									flexDirection: "column",
+									gap: "1rem",
+									textDecoration: "none",
 									alignItems: "center",
 									justifyContent: "center",
 									cursor: "pointer",
@@ -145,17 +182,17 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 									justifyContent: "center",
 									cursor: "pointer",
 									transition: "all 0.2s ease",
-									border: "2px dashed var(--gray-6)",
+									border: "2px dashed var(--accent-6)",
 									borderRadius: "8px",
 									minHeight: "100px",
+									backgroundColor: "var(--accent-3)",
+									color: "var(--accent-11)",
 								}}
 								onMouseOver={(e) => {
-									e.currentTarget.style.backgroundColor = "var(--gray-2)";
-									e.currentTarget.style.color = "var(--gray-12)";
+									e.currentTarget.style.borderColor = "var(--accent-8)";
 								}}
 								onMouseOut={(e) => {
-									e.currentTarget.style.backgroundColor = "";
-									e.currentTarget.style.color = "";
+									e.currentTarget.style.borderColor = "var(--accent-6)";
 								}}
 							>
 								<Flex direction="column" align="center" gap="2">
