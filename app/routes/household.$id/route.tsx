@@ -1,5 +1,5 @@
 import type { Route } from "./+types/route";
-import { Link, useLoaderData, Form, useActionData, useFetcher } from "react-router";
+import { Link, useLoaderData, Form, useActionData, useFetcher, useLocation } from "react-router";
 import { checkUser } from "~/lib/auth/session";
 import { redirect } from "react-router";
 import { drizzle } from "drizzle-orm/d1";
@@ -212,6 +212,7 @@ export const action = async ({
 };
 
 export default function HouseholdPage() {
+	const location = useLocation();
 	const { household, isOwner, categories, tags, members, summary, fixedList } =
 		useLoaderData<typeof loader>();
 	const actionData = useActionData();
@@ -330,6 +331,7 @@ const [inviteForm, inviteFields] = useForm({
 							style={{ display: "contents" }}
 						>
 							<ExpenseForm
+								key={location.key}
 								categories={categories}
 								tags={tags}
 								members={members}

@@ -43,7 +43,21 @@ export default function ExpenseForm({
 }: ExpenseFormProps) {
 	const { amount, category, tags: tagsField, note, payer, paidAt } = fields;
 
-	const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
+	const [selectedTags, setSelectedTags] = React.useState<string[]>(() => {
+		if (typeof tagsField.initialValue === "string") {
+			return tagsField.initialValue.split(",").filter(Boolean);
+		}
+		return [];
+	});
+
+	React.useEffect(() => {
+		if (typeof tagsField.initialValue === "string") {
+			setSelectedTags(tagsField.initialValue.split(",").filter(Boolean));
+		} else {
+			setSelectedTags([]);
+		}
+	}, [tagsField.initialValue]);
+
 	const toggleTag = (id: string) =>
 		setSelectedTags((prev) =>
 			prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id],
@@ -77,6 +91,7 @@ export default function ExpenseForm({
 				<Box style={{ maxWidth: 200 }}>
 					<Select.Root
 						name={category.name}
+						key={category.key}
 						defaultValue={category.initialValue as string | undefined}
 					>
 						<Select.Trigger
@@ -137,6 +152,8 @@ export default function ExpenseForm({
 				<TextField.Root
 					placeholder="メモを入力(任意)"
 					name={note.name}
+					key={note.key}
+					defaultValue={note.initialValue}
 					style={{ maxWidth: 200 }}
 				/>
 				{note.errors && (
@@ -152,6 +169,7 @@ export default function ExpenseForm({
 				<Box style={{ maxWidth: 200 }}>
 					<Select.Root
 						name={payer.name}
+						key={payer.key}
 						defaultValue={payer.initialValue as string | undefined}
 					>
 						<Select.Trigger
@@ -195,6 +213,7 @@ export default function ExpenseForm({
 				<input
 					type="hidden"
 					name={tagsField.name}
+					key={tagsField.key}
 					value={selectedTags.join(",")}
 				/>
 
