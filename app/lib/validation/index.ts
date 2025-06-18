@@ -47,3 +47,17 @@ export const ExpenseFormSchema = object({
 	payer: pipe(string(ExpenseFormMessages.payer)),
 	paidAt: pipe(string(ExpenseFormMessages.paidAt)),
 });
+
+export const InviteFormMessages = {
+	invitee_email: {
+		format: "メールアドレスの形式が正しくありません",
+		empty: "メールアドレスは必須です",
+	},
+};
+export const InviteFormSchema = object({
+	invitee_email: pipe(
+		string(),
+		email(InviteFormMessages.invitee_email.format),
+		nonEmpty(InviteFormMessages.invitee_email.empty),
+	),
+});

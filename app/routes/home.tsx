@@ -10,19 +10,71 @@ import {
 	Text,
 	TextField,
 } from "@radix-ui/themes";
+import InvitationNotification from "~/components/InvitationNotification";
 import { Cross2Icon, PlusIcon } from "@radix-ui/react-icons";
 import { checkUser } from "~/lib/auth/session";
 import { Form, redirect, useActionData, Link } from "react-router";
 import type { Route } from "./+types/home";
 import { drizzle } from "drizzle-orm/d1";
-import { householdsTable, householdUsersTable, categoriesTable, tagsTable } from "server/db/schema";
+import {
+	householdsTable,
+	householdUsersTable,
+	categoriesTable,
+	tagsTable,
+	usersTable,
+	householdInvitationsTable,
+} from "server/db/schema";
 import { useForm } from "@conform-to/react";
 import { parseWithValibot } from "@conform-to/valibot";
 import { NewHouseholdSchema } from "~/lib/validation";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export const action = async ({ request, context }: Route.ActionArgs) => {
 	const formData = await request.formData();
+	const intent = formData.get("intent");
+	if (intent === "accept" || intent === "decline") {
+		const invitationId = String(formData.get("invitation_id"));
+		if (!invitationId) return redirect("/home");
+		const db = drizzle(context.cloudflare.env.DB);
+		if (intent === "accept") {
+			// update invitation status
+			let householdIdToRedirect: string | undefined;
+			const [inv] = await db
+				.update(householdInvitationsTable)
+				.set({ status: 1, responded_at: new Date().toISOString() })
+				.where(eq(householdInvitationsTable.id, invitationId))
+				.returning();
+
+			if (inv) {
+				householdIdToRedirect = inv.household_id;
+				await db.insert(householdUsersTable).values({
+					household_id: inv.household_id,
+					user_id:
+						inv.invitee_id ??
+						(await (async () => {
+							const user = await checkUser(context.hono.context);
+							if (user.state !== "authenticated")
+								throw new Error("unauthenticated");
+							return user.userId;
+						})()),
+					owner: false,
+				});
+			}
+			if (householdIdToRedirect) {
+				return redirect(`/household/${householdIdToRedirect}`);
+			}
+		} else {
+			await db
+				.update(householdInvitationsTable)
+				.set({ status: 2, responded_at: new Date().toISOString() })
+				.where(eq(householdInvitationsTable.id, invitationId));
+		}
+		return redirect("/home");
+	}
+
+	// household creation
+
+	// moved above
 	const submission = parseWithValibot(formData, { schema: NewHouseholdSchema });
 	if (submission.status !== "success") {
 		return submission.reply();
@@ -52,19 +104,23 @@ export const action = async ({ request, context }: Route.ActionArgs) => {
 		"交際費・プレゼント",
 		"税金・社会保険",
 		"その他",
-	].map((name) => ({ name, household_id: householdId, is_expense: true })).concat(
-		[
-			"給与・賞与",
-			"副収入",
-			"投資・配当",
-			"その他収入",
-		].map((name) => ({ name, household_id: householdId, is_expense: false }))
-	);
+	]
+		.map((name) => ({ name, household_id: householdId, is_expense: true }))
+		.concat(
+			["給与・賞与", "副収入", "投資・配当", "その他収入"].map((name) => ({
+				name,
+				household_id: householdId,
+				is_expense: false,
+			})),
+		);
 
 	await db.insert(categoriesTable).values(defaultCategories);
 
 	// デフォルトタグを挿入
-	const defaultTags = ["必要", "不必要"].map((name) => ({ name, household_id: householdId }));
+	const defaultTags = ["必要", "不必要"].map((name) => ({
+		name,
+		household_id: householdId,
+	}));
 	await db.insert(tagsTable).values(defaultTags);
 
 	const user = await checkUser(context.hono.context);
@@ -97,11 +153,32 @@ export const loader = async ({ context }: Route.LoaderArgs) => {
 			eq(householdUsersTable.household_id, householdsTable.id),
 		)
 		.where(eq(householdUsersTable.user_id, user.userId));
-	return { name: user.name, households };
+	const invitations = await db
+		.select({
+			id: householdInvitationsTable.id,
+			inviterName: usersTable.name,
+			householdName: householdsTable.name,
+		})
+		.from(householdInvitationsTable)
+		.innerJoin(
+			usersTable,
+			eq(householdInvitationsTable.inviter_id, usersTable.id),
+		)
+		.innerJoin(
+			householdsTable,
+			eq(householdInvitationsTable.household_id, householdsTable.id),
+		)
+		.where(
+			and(
+				eq(householdInvitationsTable.invitee_email, user.email),
+				eq(householdInvitationsTable.status, 0),
+			),
+		);
+	return { name: user.name, households, invitations };
 };
 
 export default function Index({ loaderData }: Route.ComponentProps) {
-	const { name, households } = loaderData;
+	const { name, households, invitations } = loaderData;
 	const lastResult = useActionData();
 	const [form, fields] = useForm({
 		lastResult,
@@ -117,7 +194,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 			pt={"4"}
 			style={{ maxWidth: "100%", overflow: "hidden" }}
 		>
-			<h1>home</h1>
+			<Flex align="center" justify="between" mb="3">
+				<h1>home</h1>
+				<InvitationNotification invitations={invitations} />
+			</Flex>
 			<h2>Welcome {name}</h2>
 			<Grid
 				columns={{ initial: "1", sm: "2", md: "3" }}

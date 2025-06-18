@@ -11,6 +11,7 @@ import {
 	usersTable,
 	expensesTable,
 	fixedExpensesTable,
+	householdInvitationsTable,
 } from "server/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import {
@@ -28,7 +29,7 @@ import FixedExpenseSection from "app/components/FixedExpenseSection";
 import type React from "react";
 import { useForm } from "@conform-to/react";
 import { parseWithValibot } from "@conform-to/valibot";
-import { ExpenseFormSchema } from "app/lib/validation";
+import { ExpenseFormSchema, InviteFormSchema } from "app/lib/validation";
 
 export const loader = async ({
 	request,
@@ -167,6 +168,24 @@ export const action = async ({
 	}
 
 	const formData = await request.formData();
+	const intent = formData.get("intent");
+
+	if (intent === "invite") {
+		const inviteSubmission = parseWithValibot(formData, { schema: InviteFormSchema });
+		if (inviteSubmission.status !== "success") {
+			return inviteSubmission.reply();
+		}
+		const { invitee_email: email } = inviteSubmission.value;
+		const db = drizzle(context.cloudflare.env.DB);
+		await db.insert(householdInvitationsTable).values({
+			household_id: params.id,
+			inviter_id: user.userId,
+			invitee_email: email,
+			token: crypto.randomUUID(),
+		});
+		return redirect(`/household/${params.id}`);
+	}
+
 	const submission = parseWithValibot(formData, { schema: ExpenseFormSchema });
 
 	if (submission.status !== "success") {
@@ -206,36 +225,60 @@ export default function HouseholdPage() {
 	});
 
 	const fetcher = useFetcher<typeof loader>();
+const inviteFetcher = useFetcher<typeof action>();
+const [inviteForm, inviteFields] = useForm({
+	lastResult: inviteFetcher.data,
+	shouldValidate: "onSubmit",
+	shouldRevalidate: "onSubmit",
+	onValidate({ formData }) {
+		return parseWithValibot(formData, { schema: InviteFormSchema });
+	},
+});
 	const currentSummary = fetcher.data?.summary ?? summary;
 
 	return (
 		<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
-			<Flex justify="between" align="center" mb="4">
-				<Button asChild variant="ghost">
+			<Flex justify="center" align="center" mb="4" style={{ position: "relative" }}>
+				<Button asChild variant="ghost" style={{ position: "absolute", left: 0 }}>
 					<Link to="/home">戻る</Link>
 				</Button>
 				<Text size="6" weight="bold">
 					{household.name}
 				</Text>
 				{isOwner && (
+					<div style={{ position: "absolute", right: 0 }}>
 					<Dialog.Root>
 						<Dialog.Trigger>
 							<Button variant="surface">メンバー招待</Button>
 						</Dialog.Trigger>
 						<Dialog.Content style={{ padding: "var(--space-4)" }}>
 							<Dialog.Title mb="3">メールで招待</Dialog.Title>
-							<TextField.Root
-								placeholder="email@example.com"
+							<inviteFetcher.Form
+								onSubmit={inviteForm.onSubmit}
+								method="post"
 								style={{ width: "100%" }}
-							/>
-							<Flex mt="4" justify="end" gap="2">
-								<Dialog.Close>
-									<Button variant="soft">キャンセル</Button>
-								</Dialog.Close>
-								<Button variant="solid">送信</Button>
-							</Flex>
+							>
+								<input type="hidden" name="intent" value="invite" />
+								<TextField.Root
+									variant="surface"
+									placeholder="email@example.com"
+									name={inviteFields.invitee_email.name}
+									key={inviteFields.invitee_email.key}
+									style={{ width: "100%" }}
+								/>
+								{inviteFields.invitee_email.errors && (
+									<Text color="red" size="1">{inviteFields.invitee_email.errors}</Text>
+								)}
+								<Flex mt="4" justify="end" gap="2">
+									<Dialog.Close>
+										<Button variant="soft" type="button">キャンセル</Button>
+									</Dialog.Close>
+									<Button variant="solid" type="submit">送信</Button>
+								</Flex>
+							</inviteFetcher.Form>
 						</Dialog.Content>
 					</Dialog.Root>
+				</div>
 				)}
 			</Flex>
 
