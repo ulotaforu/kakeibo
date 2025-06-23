@@ -92,22 +92,28 @@ export const action = async ({ request, context }: Route.ActionArgs) => {
 	const defaultCategories = [
 		// 支出
 		"食費",
-		"日用品・消耗品",
-		"交通費・移動",
+		"外食",
+		"日用品",
+		"交通費",
 		"住居費",
-		"水道光熱費",
-		"通信費",
-		"医療・保険",
-		"教育・学習",
-		"娯楽・趣味",
-		"衣服・美容",
-		"交際費・プレゼント",
-		"税金・社会保険",
+		"電気",
+		"ガス",
+		"水道",
+		"通信",
+		"医療",
+		"保険",
+		"教育",
+		"娯楽",
+		"衣服",
+		"美容",
+		"交際費",
+		"税金",
+		"旅行",
 		"その他",
 	]
 		.map((name) => ({ name, household_id: householdId, is_expense: true }))
 		.concat(
-			["給与・賞与", "副収入", "投資・配当", "その他収入"].map((name) => ({
+			["給与", "賞与", "副収入", "その他"].map((name) => ({
 				name,
 				household_id: householdId,
 				is_expense: false,
