@@ -1,5 +1,12 @@
 import type { Route } from "./+types/route";
-import { Link, useLoaderData, Form, useActionData, useFetcher, useLocation } from "react-router";
+import {
+	Link,
+	useLoaderData,
+	Form,
+	useActionData,
+	useFetcher,
+	useLocation,
+} from "react-router";
 import { checkUser } from "~/lib/auth/session";
 import { redirect } from "react-router";
 import { drizzle } from "drizzle-orm/d1";
@@ -12,6 +19,7 @@ import {
 	expensesTable,
 	fixedExpensesTable,
 	householdInvitationsTable,
+	incomesTable,
 } from "server/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import {
@@ -29,7 +37,11 @@ import FixedExpenseSection from "app/components/FixedExpenseSection";
 import type React from "react";
 import { useForm } from "@conform-to/react";
 import { parseWithValibot } from "@conform-to/valibot";
-import { ExpenseFormSchema, InviteFormSchema } from "app/lib/validation";
+import {
+	ExpenseFormSchema,
+	IncomeFormSchema,
+	InviteFormSchema,
+} from "app/lib/validation";
 
 export const loader = async ({
 	request,
@@ -171,7 +183,9 @@ export const action = async ({
 	const intent = formData.get("intent");
 
 	if (intent === "invite") {
-		const inviteSubmission = parseWithValibot(formData, { schema: InviteFormSchema });
+		const inviteSubmission = parseWithValibot(formData, {
+			schema: InviteFormSchema,
+		});
 		if (inviteSubmission.status !== "success") {
 			return inviteSubmission.reply();
 		}
@@ -186,6 +200,30 @@ export const action = async ({
 		return redirect(`/household/${params.id}`);
 	}
 
+	// 収入登録処理
+	if (intent === "income") {
+		const incomeSubmission = parseWithValibot(formData, { schema: IncomeFormSchema });
+		
+		if (incomeSubmission.status !== "success") {
+			return incomeSubmission.reply();
+		}
+
+		const { amount, category, payee, receivedAt } = incomeSubmission.value;
+		const categoryId = String(category);
+
+		const db = drizzle(context.cloudflare.env.DB);
+		await db.insert(incomesTable).values({
+			amount,
+			household_id: params.id,
+			category_id: categoryId,
+			payee,
+			received_at: receivedAt,
+		});
+
+		return redirect(`/household/${params.id}`);
+	}
+
+	// 支出登録処理
 	const submission = parseWithValibot(formData, { schema: ExpenseFormSchema });
 
 	if (submission.status !== "success") {
@@ -224,23 +262,40 @@ export default function HouseholdPage() {
 			return parseWithValibot(formData, { schema: ExpenseFormSchema });
 		},
 	});
+	const [incomeForm, incomeFields] = useForm({
+		lastResult: actionData,
+		shouldValidate: "onSubmit",
+		shouldRevalidate: "onSubmit",
+		onValidate({ formData }) {
+			return parseWithValibot(formData, { schema: IncomeFormSchema });
+		},
+	});
 
 	const fetcher = useFetcher<typeof loader>();
-const inviteFetcher = useFetcher<typeof action>();
-const [inviteForm, inviteFields] = useForm({
-	lastResult: inviteFetcher.data,
-	shouldValidate: "onSubmit",
-	shouldRevalidate: "onSubmit",
-	onValidate({ formData }) {
-		return parseWithValibot(formData, { schema: InviteFormSchema });
-	},
-});
+	const inviteFetcher = useFetcher<typeof action>();
+	const [inviteForm, inviteFields] = useForm({
+		lastResult: inviteFetcher.data,
+		shouldValidate: "onSubmit",
+		shouldRevalidate: "onSubmit",
+		onValidate({ formData }) {
+			return parseWithValibot(formData, { schema: InviteFormSchema });
+		},
+	});
 	const currentSummary = fetcher.data?.summary ?? summary;
 
 	return (
 		<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
-			<Flex justify="center" align="center" mb="4" style={{ position: "relative" }}>
-				<Button asChild variant="ghost" style={{ position: "absolute", left: 0 }}>
+			<Flex
+				justify="center"
+				align="center"
+				mb="4"
+				style={{ position: "relative" }}
+			>
+				<Button
+					asChild
+					variant="ghost"
+					style={{ position: "absolute", left: 0 }}
+				>
 					<Link to="/home">戻る</Link>
 				</Button>
 				<Text size="6" weight="bold">
@@ -248,38 +303,44 @@ const [inviteForm, inviteFields] = useForm({
 				</Text>
 				{isOwner && (
 					<div style={{ position: "absolute", right: 0 }}>
-					<Dialog.Root>
-						<Dialog.Trigger>
-							<Button variant="surface">メンバー招待</Button>
-						</Dialog.Trigger>
-						<Dialog.Content style={{ padding: "var(--space-4)" }}>
-							<Dialog.Title mb="3">メールで招待</Dialog.Title>
-							<inviteFetcher.Form
-								onSubmit={inviteForm.onSubmit}
-								method="post"
-								style={{ width: "100%" }}
-							>
-								<input type="hidden" name="intent" value="invite" />
-								<TextField.Root
-									variant="surface"
-									placeholder="email@example.com"
-									name={inviteFields.invitee_email.name}
-									key={inviteFields.invitee_email.key}
+						<Dialog.Root>
+							<Dialog.Trigger>
+								<Button variant="surface">メンバー招待</Button>
+							</Dialog.Trigger>
+							<Dialog.Content style={{ padding: "var(--space-4)" }}>
+								<Dialog.Title mb="3">メールで招待</Dialog.Title>
+								<inviteFetcher.Form
+									onSubmit={inviteForm.onSubmit}
+									method="post"
 									style={{ width: "100%" }}
-								/>
-								{inviteFields.invitee_email.errors && (
-									<Text color="red" size="1">{inviteFields.invitee_email.errors}</Text>
-								)}
-								<Flex mt="4" justify="end" gap="2">
-									<Dialog.Close>
-										<Button variant="soft" type="button">キャンセル</Button>
-									</Dialog.Close>
-									<Button variant="solid" type="submit">送信</Button>
-								</Flex>
-							</inviteFetcher.Form>
-						</Dialog.Content>
-					</Dialog.Root>
-				</div>
+								>
+									<input type="hidden" name="intent" value="invite" />
+									<TextField.Root
+										variant="surface"
+										placeholder="email@example.com"
+										name={inviteFields.invitee_email.name}
+										key={inviteFields.invitee_email.key}
+										style={{ width: "100%" }}
+									/>
+									{inviteFields.invitee_email.errors && (
+										<Text color="red" size="1">
+											{inviteFields.invitee_email.errors}
+										</Text>
+									)}
+									<Flex mt="4" justify="end" gap="2">
+										<Dialog.Close>
+											<Button variant="soft" type="button">
+												キャンセル
+											</Button>
+										</Dialog.Close>
+										<Button variant="solid" type="submit">
+											送信
+										</Button>
+									</Flex>
+								</inviteFetcher.Form>
+							</Dialog.Content>
+						</Dialog.Root>
+					</div>
 				)}
 			</Flex>
 
@@ -294,14 +355,18 @@ const [inviteForm, inviteFields] = useForm({
 				{/* サマリー */}
 				<Tabs.Content value="summary">
 					<Flex direction="column" p="4" gap="2">
-						<fetcher.Form method="get" style={{ marginBottom: "var(--space-2)" }}>
+						<fetcher.Form
+							method="get"
+							style={{ marginBottom: "var(--space-2)" }}
+						>
 							<Flex align="center" gap="2">
 								<TextField.Root
 									type="month"
 									name="ym"
 									defaultValue={currentSummary.ym}
 									onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-										e.currentTarget.form?.requestSubmit()}
+										e.currentTarget.form?.requestSubmit()
+									}
 									style={{ width: "140px", padding: "var(--space-1)" }}
 									max={new Date().toISOString().slice(0, 7)}
 								/>
@@ -330,6 +395,7 @@ const [inviteForm, inviteFields] = useForm({
 							noValidate
 							style={{ display: "contents" }}
 						>
+							<input type="hidden" name="intent" value="expense" />
 							<ExpenseForm
 								key={location.key}
 								categories={categories}
@@ -344,7 +410,20 @@ const [inviteForm, inviteFields] = useForm({
 				{/* 収入登録 */}
 				<Tabs.Content value="income">
 					<Flex direction="column" p="4">
-						<IncomeForm categories={categories} members={members} />
+						<Form
+							method="post"
+							id={incomeForm.id}
+							onSubmit={incomeForm.onSubmit}
+							noValidate
+							style={{ display: "contents" }}
+						>
+							<input type="hidden" name="intent" value="income" />
+							<IncomeForm
+								categories={categories}
+								members={members}
+								fields={incomeFields}
+							/>
+						</Form>
 					</Flex>
 				</Tabs.Content>
 

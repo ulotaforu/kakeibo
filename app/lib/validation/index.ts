@@ -48,6 +48,19 @@ export const ExpenseFormSchema = object({
 	paidAt: pipe(string(ExpenseFormMessages.paidAt)),
 });
 
+export const IncomeFormMessages = {
+	amount: "金額を入力してください",
+	category: "カテゴリを選択してください",
+	payee: "収入があった人を選択してください",
+	receivedAt: "収入日を選択してください",
+};
+export const IncomeFormSchema = object({
+	amount: pipe(number(IncomeFormMessages.amount)),
+	category: pipe(string(IncomeFormMessages.category)),
+	payee: pipe(string(IncomeFormMessages.payee)),
+	receivedAt: pipe(string(IncomeFormMessages.receivedAt)),
+});
+
 export const InviteFormMessages = {
 	invitee_email: {
 		format: "メールアドレスの形式が正しくありません",
