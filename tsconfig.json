@@ -11,7 +11,7 @@
 	],
 	"compilerOptions": {
 		"lib": ["DOM", "DOM.Iterable", "ES2022"],
-		"types": ["vite/client", "@cloudflare/workers-types/2023-07-01"],
+		"types": ["vite/client", "vitest", "vitest/globals", "@cloudflare/workers-types/2023-07-01"],
 		"isolatedModules": true,
 		"esModuleInterop": true,
 		"jsx": "react-jsx",
