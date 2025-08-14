@@ -218,7 +218,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 			>
 				{households.map((household) => (
 					<Link
-						to={`/household/${household.id}`}
+						to={`/${household.id}`}
 						key={household.id}
 						style={{
 							textDecoration: "none",
