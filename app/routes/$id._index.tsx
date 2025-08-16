@@ -1,8 +1,6 @@
 import type { Route } from "./+types/_index";
-import {
-	useLoaderData,
-	useFetcher,
-} from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
+import { useEffect, useState } from "react";
 import { checkUser } from "~/lib/auth/session";
 import { redirect } from "react-router";
 import { drizzle } from "drizzle-orm/d1";
@@ -29,10 +27,7 @@ import { InviteFormSchema } from "app/lib/validation";
 import { HamburgerMenu } from "~/components/HamburgerMenu";
 import { MonthlySummary } from "~/components/MonthlySummary";
 
-export const loader = async ({
-	params,
-	context,
-}: Route.LoaderArgs) => {
+export const loader = async ({ params, context }: Route.LoaderArgs) => {
 	const user = await checkUser(context.hono.context);
 	if (user.state !== "authenticated") {
 		return redirect("/signin");
@@ -141,7 +136,8 @@ export const action = async ({
 };
 
 export default function HouseholdDashboard() {
-	const { household, isOwner, totalExpenses, totalIncome, currentMonth } = useLoaderData<typeof loader>();
+	const { household, isOwner, totalExpenses, totalIncome, currentMonth } =
+		useLoaderData<typeof loader>();
 	const inviteFetcher = useFetcher<typeof action>();
 	const [inviteForm, inviteFields] = useForm({
 		lastResult: inviteFetcher.data,
@@ -152,84 +148,90 @@ export default function HouseholdDashboard() {
 		},
 	});
 
+	const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+
+	// ページタイトルを家計簿名に設定
+	useEffect(() => {
+		document.title = `${household.name} - Kakeibo`;
+	}, [household.name]);
+
 	return (
 		<Flex style={{ minHeight: "100vh", backgroundColor: "#F8F6F1" }}>
 			{/* サイドバー（ハンバーガーメニュー） */}
 			<Box style={{ position: "fixed", left: 0, top: 0, zIndex: 10 }}>
-				<HamburgerMenu householdId={household.id} />
+				<HamburgerMenu
+					householdId={household.id}
+					isOwner={isOwner}
+					onInviteClick={() => setIsInviteDialogOpen(true)}
+				/>
 			</Box>
 
 			{/* メインコンテンツ */}
-			<Box style={{ 
-				marginLeft: "var(--sidebar-width, 45px)", 
-				width: "calc(100% - var(--sidebar-width, 45px))", 
-				padding: "var(--space-4)",
-				transition: "margin-left 0.2s ease, width 0.2s ease",
-				backgroundColor: "#F8F6F1",
-				color: "#383838"
-			}}>
+			<Box
+				style={{
+					marginLeft: "var(--sidebar-width, 45px)",
+					width: "calc(100% - var(--sidebar-width, 45px))",
+					padding: "var(--space-4)",
+					transition: "margin-left 0.2s ease, width 0.2s ease",
+					backgroundColor: "#F8F6F1",
+					color: "#383838",
+				}}
+			>
 				{/* ヘッダー */}
 				<Flex
 					justify="center"
 					align="center"
 					mb="4"
-					style={{ position: "relative" }}
 				>
 					<Text size="6" weight="bold">
 						{household.name}
 					</Text>
-
-					{isOwner && (
-						<Box style={{ position: "absolute", right: 0 }}>
-							<Dialog.Root>
-								<Dialog.Trigger>
-									<Button variant="surface" size="2">招待</Button>
-								</Dialog.Trigger>
-								<Dialog.Content style={{ padding: "var(--space-4)" }}>
-									<Dialog.Title mb="3">メールで招待</Dialog.Title>
-									<inviteFetcher.Form
-										onSubmit={inviteForm.onSubmit}
-										method="post"
-										style={{ width: "100%" }}
-									>
-										<input type="hidden" name="intent" value="invite" />
-										<TextField.Root
-											variant="surface"
-											placeholder="email@example.com"
-											name={inviteFields.invitee_email.name}
-											key={inviteFields.invitee_email.key}
-											style={{ width: "100%" }}
-										/>
-										{inviteFields.invitee_email.errors && (
-											<Text color="red" size="1">
-												{inviteFields.invitee_email.errors}
-											</Text>
-										)}
-										<Flex mt="4" justify="end" gap="2">
-											<Dialog.Close>
-												<Button variant="soft" type="button">
-													キャンセル
-												</Button>
-											</Dialog.Close>
-											<Button variant="solid" type="submit">
-												送信
-											</Button>
-										</Flex>
-									</inviteFetcher.Form>
-								</Dialog.Content>
-							</Dialog.Root>
-						</Box>
-					)}
 				</Flex>
 
 				{/* 月次サマリー */}
 				<Container size="3" style={{ maxWidth: "100%" }}>
-					<MonthlySummary 
+					<MonthlySummary
 						totalExpenses={totalExpenses}
 						totalIncome={totalIncome}
 						currentMonth={currentMonth}
 					/>
 				</Container>
+
+				{/* 招待ダイアログ */}
+				<Dialog.Root open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+					<Dialog.Content style={{ padding: "var(--space-4)" }}>
+						<Dialog.Title mb="3">メールで招待</Dialog.Title>
+						<inviteFetcher.Form
+							onSubmit={inviteForm.onSubmit}
+							method="post"
+							style={{ width: "100%" }}
+						>
+							<input type="hidden" name="intent" value="invite" />
+							<TextField.Root
+								variant="surface"
+								placeholder="email@example.com"
+								name={inviteFields.invitee_email.name}
+								key={inviteFields.invitee_email.key}
+								style={{ width: "100%" }}
+							/>
+							{inviteFields.invitee_email.errors && (
+								<Text color="red" size="1">
+									{inviteFields.invitee_email.errors}
+								</Text>
+							)}
+							<Flex mt="4" justify="end" gap="2">
+								<Dialog.Close>
+									<Button variant="soft" type="button">
+										キャンセル
+									</Button>
+								</Dialog.Close>
+								<Button variant="solid" type="submit">
+									送信
+								</Button>
+							</Flex>
+						</inviteFetcher.Form>
+					</Dialog.Content>
+				</Dialog.Root>
 			</Box>
 		</Flex>
 	);
