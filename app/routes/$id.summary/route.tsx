@@ -1,5 +1,5 @@
 import type { Route } from "./+types/route";
-import { Link, useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import { checkUser } from "~/lib/auth/session";
 import { redirect } from "react-router";
 import { drizzle } from "drizzle-orm/d1";
@@ -13,18 +13,21 @@ import {
 } from "server/db/schema";
 import { eq, and, sql, count, desc } from "drizzle-orm";
 import {
-	Button,
 	Container,
 	Flex,
 	Text,
 	TextField,
 	Box,
-	Table,
-	IconButton,
 } from "@radix-ui/themes";
-import { ChevronLeftIcon, ChevronRightIcon } from "@radix-ui/react-icons";
 import { HamburgerMenu } from "~/components/HamburgerMenu";
+import { EditExpenseDialog } from "~/components/EditExpenseDialog";
+import { ExpenseTable } from "~/components/ExpenseTable";
+import { SummaryStats } from "~/components/SummaryStats";
+import { PaginationControls } from "~/components/PaginationControls";
 import type React from "react";
+import { useState, useEffect, useCallback } from "react";
+import { parseWithValibot } from "@conform-to/valibot";
+import { ExpenseFormSchema } from "~/lib/validation";
 
 export const loader = async ({
 	request,
@@ -112,6 +115,9 @@ export const loader = async ({
 				amount: expensesTable.amount,
 				note: expensesTable.note,
 				paid_at: expensesTable.paid_at,
+				category_id: expensesTable.category_id,
+				tag_id: expensesTable.tag_id,
+				payer: expensesTable.payer,
 				categoryName: categoriesTable.name,
 				tagName: tagsTable.name,
 				payerName: usersTable.name,
@@ -133,6 +139,22 @@ export const loader = async ({
 			.limit(pageSize)
 			.offset(offset),
 	]);
+
+	// 編集用のデータを取得
+	const categories = await db
+		.select({ id: categoriesTable.id, name: categoriesTable.name })
+		.from(categoriesTable)
+		.where(
+			and(
+				eq(categoriesTable.household_id, params.id),
+				eq(categoriesTable.is_expense, true),
+			),
+		);
+
+	const tags = await db
+		.select({ id: tagsTable.id, name: tagsTable.name })
+		.from(tagsTable)
+		.where(eq(tagsTable.household_id, params.id));
 
 	// 総件数を取得
 	const [totalCountResult] = await db
@@ -159,16 +181,98 @@ export const loader = async ({
 			totalCount,
 			pageSize,
 		},
+		categories,
+		tags,
+		members,
 	};
 };
 
+export const action = async ({
+	request,
+	params,
+	context,
+}: Route.ActionArgs) => {
+	const user = await checkUser(context.hono.context);
+	if (user.state !== "authenticated") {
+		return redirect("/signin");
+	}
+
+	const formData = await request.formData();
+	const intent = formData.get("intent");
+
+	if (intent === "update") {
+		const submission = parseWithValibot(formData, {
+			schema: ExpenseFormSchema,
+		});
+		if (submission.status !== "success") {
+			return submission.reply();
+		}
+
+		const { amount, category, tags, note, payer, paidAt } = submission.value;
+		const expenseId = formData.get("expenseId");
+
+		if (!expenseId) {
+			return { error: "支出IDが必要です" };
+		}
+
+		const db = drizzle(context.cloudflare.env.DB);
+
+		// 支出の更新
+		const tagIds = String(tags).split(",").filter(Boolean);
+		const tagId = tagIds.length > 0 ? tagIds[0] : undefined;
+		await db
+			.update(expensesTable)
+			.set({
+				amount,
+				category_id: String(category),
+				tag_id: tagId,
+				note,
+				payer: String(payer),
+				paid_at: paidAt,
+			})
+			.where(
+				and(
+					eq(expensesTable.id, String(expenseId)),
+					eq(expensesTable.household_id, params.id as string),
+				),
+			);
+
+		return { success: "支出を更新しました" };
+	}
+
+	return null;
+};
+
+
 export default function HouseholdSummaryPage() {
-	const { household, isOwner, summary, detailExpenses, pagination } =
-		useLoaderData<typeof loader>();
+	const {
+		household,
+		isOwner,
+		summary,
+		detailExpenses,
+		pagination,
+		categories,
+		tags,
+		members,
+	} = useLoaderData<typeof loader>();
 	const fetcher = useFetcher<typeof loader>();
+	const editFetcher = useFetcher<typeof action>();
 	const currentSummary = fetcher.data?.summary ?? summary;
 	const currentDetailExpenses = fetcher.data?.detailExpenses ?? detailExpenses;
 	const currentPagination = fetcher.data?.pagination ?? pagination;
+	const currentCategories = fetcher.data?.categories ?? categories;
+	const currentTags = fetcher.data?.tags ?? tags;
+	const currentMembers = fetcher.data?.members ?? members;
+
+	const [editingExpense, setEditingExpense] = useState<any | null>(null);
+	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+	const handleCloseEditDialog = useCallback(() => {
+		setIsEditDialogOpen(false);
+		setEditingExpense(null);
+		// データをリフレッシュ
+		fetcher.load(window.location.pathname + window.location.search);
+	}, [fetcher.load]);
 
 	return (
 		<Flex style={{ minHeight: "100vh", backgroundColor: "#F8F6F1" }}>
@@ -230,22 +334,10 @@ export default function HouseholdSummaryPage() {
 						</fetcher.Form>
 
 						{/* サマリー */}
-						<Box>
-							<Text
-								size="5"
-								weight="medium"
-								style={{ marginBottom: "var(--space-2)", display: "block" }}
-							>
-								合計: {currentSummary.totalAmount.toLocaleString()} 円
-							</Text>
-							<Flex direction="column" gap="1">
-								{currentSummary.perPayer.map((p) => (
-									<Text key={p.name} size="3">
-										{p.name}: {p.amount.toLocaleString()} 円
-									</Text>
-								))}
-							</Flex>
-						</Box>
+						<SummaryStats
+							totalAmount={currentSummary.totalAmount}
+							perPayer={currentSummary.perPayer}
+						/>
 
 						{/* 詳細テーブル */}
 						<Box>
@@ -258,123 +350,38 @@ export default function HouseholdSummaryPage() {
 							</Text>
 
 							{/* テーブル */}
-							<Box style={{ overflowX: "auto" }}>
-								<Table.Root variant="surface">
-									<Table.Header>
-										<Table.Row>
-											<Table.ColumnHeaderCell>日付</Table.ColumnHeaderCell>
-											<Table.ColumnHeaderCell>金額</Table.ColumnHeaderCell>
-											<Table.ColumnHeaderCell>カテゴリ</Table.ColumnHeaderCell>
-											<Table.ColumnHeaderCell>タグ</Table.ColumnHeaderCell>
-											<Table.ColumnHeaderCell>支払者</Table.ColumnHeaderCell>
-											<Table.ColumnHeaderCell>メモ</Table.ColumnHeaderCell>
-										</Table.Row>
-									</Table.Header>
-									<Table.Body>
-										{(currentDetailExpenses ?? []).map((expense) => (
-											<Table.Row key={expense.id}>
-												<Table.Cell>
-													<Text size="2">
-														{new Date(expense.paid_at).toLocaleDateString(
-															"ja-JP",
-															{
-																month: "numeric",
-																day: "numeric",
-															},
-														)}
-													</Text>
-												</Table.Cell>
-												<Table.Cell>
-													<Text size="2" weight="medium">
-														¥{expense.amount.toLocaleString()}
-													</Text>
-												</Table.Cell>
-												<Table.Cell>
-													<Text size="2">{expense.categoryName}</Text>
-												</Table.Cell>
-												<Table.Cell>
-													<Text size="2">{expense.tagName || "-"}</Text>
-												</Table.Cell>
-												<Table.Cell>
-													<Text size="2">{expense.payerName}</Text>
-												</Table.Cell>
-												<Table.Cell>
-													<Text
-														size="2"
-														style={{
-															maxWidth: "150px",
-															overflow: "hidden",
-															textOverflow: "ellipsis",
-															whiteSpace: "nowrap",
-														}}
-													>
-														{expense.note || "-"}
-													</Text>
-												</Table.Cell>
-											</Table.Row>
-										))}
-									</Table.Body>
-								</Table.Root>
-							</Box>
+							<ExpenseTable
+								expenses={currentDetailExpenses ?? []}
+								onEditExpense={(expense) => {
+									setEditingExpense(expense);
+									setIsEditDialogOpen(true);
+								}}
+							/>
 
 							{/* ページング */}
-							<Flex
-								justify="center"
-								align="center"
-								gap="2"
-								style={{ marginTop: "var(--space-4)" }}
-							>
-								<fetcher.Form method="get" style={{ display: "contents" }}>
-									<input type="hidden" name="ym" value={currentSummary.ym} />
-									<input
-										type="hidden"
-										name="page"
-										value={String(
-											Math.max(1, (currentPagination?.currentPage ?? 1) - 1),
-										)}
-									/>
-									<IconButton
-										type="submit"
-										variant="soft"
-										disabled={(currentPagination?.currentPage ?? 1) <= 1}
-									>
-										<ChevronLeftIcon />
-									</IconButton>
-								</fetcher.Form>
-
-								<Text size="2">
-									{currentPagination?.currentPage ?? 1} /{" "}
-									{currentPagination?.totalPages ?? 1}
-								</Text>
-
-								<fetcher.Form method="get" style={{ display: "contents" }}>
-									<input type="hidden" name="ym" value={currentSummary.ym} />
-									<input
-										type="hidden"
-										name="page"
-										value={String(
-											Math.min(
-												currentPagination?.totalPages ?? 1,
-												(currentPagination?.currentPage ?? 1) + 1,
-											),
-										)}
-									/>
-									<IconButton
-										type="submit"
-										variant="soft"
-										disabled={
-											(currentPagination?.currentPage ?? 1) >=
-											(currentPagination?.totalPages ?? 1)
-										}
-									>
-										<ChevronRightIcon />
-									</IconButton>
-								</fetcher.Form>
-							</Flex>
+							<PaginationControls
+								currentPage={currentPagination?.currentPage ?? 1}
+								totalPages={currentPagination?.totalPages ?? 1}
+								currentMonth={currentSummary.ym}
+								fetcher={fetcher}
+							/>
 						</Box>
 					</Flex>
 				</Container>
 			</Box>
+
+			{/* 編集ダイアログ */}
+			{editingExpense && (
+				<EditExpenseDialog
+					expense={editingExpense}
+					categories={currentCategories}
+					tags={currentTags}
+					members={currentMembers}
+					isOpen={isEditDialogOpen}
+					onClose={handleCloseEditDialog}
+					fetcher={editFetcher}
+				/>
+			)}
 		</Flex>
 	);
 }
