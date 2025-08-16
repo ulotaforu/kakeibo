@@ -20,7 +20,9 @@ import {
 	Flex,
 	Text,
 	TextField,
+	Box,
 } from "@radix-ui/themes";
+import { HamburgerMenu } from "~/components/HamburgerMenu";
 import type React from "react";
 
 export const loader = async ({
@@ -97,64 +99,80 @@ export const loader = async ({
 
 	return {
 		household,
+		isOwner: userHousehold.owner,
 		summary: { totalAmount, perPayer, ym },
 	};
 };
 
 export default function HouseholdSummaryPage() {
-	const { household, summary } = useLoaderData<typeof loader>();
+	const { household, isOwner, summary } = useLoaderData<typeof loader>();
 	const fetcher = useFetcher<typeof loader>();
 	const currentSummary = fetcher.data?.summary ?? summary;
 
 	return (
-		<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
-			<Flex
-				justify="center"
-				align="center"
-				mb="4"
-				style={{ position: "relative" }}
-			>
-				<Button
-					asChild
-					variant="ghost"
-					style={{ position: "absolute", left: 0 }}
-				>
-					<Link to={`/${household.id}`}>戻る</Link>
-				</Button>
-				<Text size="6" weight="bold">
-					{household.name} - サマリー
-				</Text>
-			</Flex>
+		<Flex style={{ minHeight: "100vh", backgroundColor: "#F8F6F1" }}>
+			{/* サイドバー（ハンバーガーメニュー） */}
+			<Box style={{ position: "fixed", left: 0, top: 0, zIndex: 10 }}>
+				<HamburgerMenu
+					householdId={household.id}
+					isOwner={isOwner}
+				/>
+			</Box>
 
-			<Flex direction="column" p="4" gap="2">
-				<fetcher.Form
-					method="get"
-					style={{ marginBottom: "var(--space-2)" }}
-				>
-					<Flex align="center" gap="2">
-						<TextField.Root
-							type="month"
-							name="ym"
-							defaultValue={currentSummary.ym}
-							onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-								e.currentTarget.form?.requestSubmit()
-							}
-							style={{ width: "140px", padding: "var(--space-1)" }}
-							max={new Date().toISOString().slice(0, 7)}
-						/>
-					</Flex>
-				</fetcher.Form>
-				<Text size="5" weight="medium">
-					合計: {currentSummary.totalAmount.toLocaleString()} 円
-				</Text>
-				<Flex direction="column" gap="1">
-					{currentSummary.perPayer.map((p) => (
-						<Text key={p.name} size="3">
-							{p.name}: {p.amount.toLocaleString()} 円
+			{/* メインコンテンツ */}
+			<Box
+				style={{
+					marginLeft: "var(--sidebar-width, 45px)",
+					width: "calc(100% - var(--sidebar-width, 45px))",
+					padding: "var(--space-4)",
+					transition: "margin-left 0.2s ease, width 0.2s ease",
+					backgroundColor: "#F8F6F1",
+					color: "#383838",
+				}}
+			>
+				<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
+					<Flex
+						justify="center"
+						align="center"
+						mb="4"
+						style={{ position: "relative" }}
+					>
+						<Text size="6" weight="bold">
+							{household.name} - サマリー
 						</Text>
-					))}
-				</Flex>
-			</Flex>
-		</Container>
+					</Flex>
+
+					<Flex direction="column" p="4" gap="2">
+						<fetcher.Form
+							method="get"
+							style={{ marginBottom: "var(--space-2)" }}
+						>
+							<Flex align="center" gap="2">
+								<TextField.Root
+									type="month"
+									name="ym"
+									defaultValue={currentSummary.ym}
+									onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+										e.currentTarget.form?.requestSubmit()
+									}
+									style={{ width: "140px", padding: "var(--space-1)" }}
+									max={new Date().toISOString().slice(0, 7)}
+								/>
+							</Flex>
+						</fetcher.Form>
+						<Text size="5" weight="medium">
+							合計: {currentSummary.totalAmount.toLocaleString()} 円
+						</Text>
+						<Flex direction="column" gap="1">
+							{currentSummary.perPayer.map((p) => (
+								<Text key={p.name} size="3">
+									{p.name}: {p.amount.toLocaleString()} 円
+								</Text>
+							))}
+						</Flex>
+					</Flex>
+				</Container>
+			</Box>
+		</Flex>
 	);
 }

@@ -1,6 +1,5 @@
 import type { Route } from "./+types/route";
 import {
-	Link,
 	useLoaderData,
 } from "react-router";
 import { checkUser } from "~/lib/auth/session";
@@ -17,12 +16,13 @@ import {
 } from "server/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import {
-	Button,
 	Container,
 	Flex,
 	Text,
+	Box,
 } from "@radix-ui/themes";
 import FixedExpenseSection from "app/components/FixedExpenseSection";
+import { HamburgerMenu } from "~/components/HamburgerMenu";
 
 export const loader = async ({
 	request,
@@ -128,6 +128,7 @@ export const loader = async ({
 
 	return {
 		household,
+		isOwner: userHousehold.owner,
 		categories,
 		tags,
 		members,
@@ -136,36 +137,51 @@ export const loader = async ({
 };
 
 export default function HouseholdFixedPage() {
-	const { household, categories, tags, members, fixedList } = useLoaderData<typeof loader>();
+	const { household, isOwner, categories, tags, members, fixedList } = useLoaderData<typeof loader>();
 
 	return (
-		<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
-			<Flex
-				justify="center"
-				align="center"
-				mb="4"
-				style={{ position: "relative" }}
-			>
-				<Button
-					asChild
-					variant="ghost"
-					style={{ position: "absolute", left: 0 }}
-				>
-					<Link to={`/${household.id}`}>戻る</Link>
-				</Button>
-				<Text size="6" weight="bold">
-					{household.name} - 固定費管理
-				</Text>
-			</Flex>
-
-			<Flex direction="column" p="4">
-				<FixedExpenseSection
-					fixedList={fixedList}
-					categories={categories}
-					tags={tags}
-					members={members}
+		<Flex style={{ minHeight: "100vh", backgroundColor: "#F8F6F1" }}>
+			{/* サイドバー（ハンバーガーメニュー） */}
+			<Box style={{ position: "fixed", left: 0, top: 0, zIndex: 10 }}>
+				<HamburgerMenu
+					householdId={household.id}
+					isOwner={isOwner}
 				/>
-			</Flex>
-		</Container>
+			</Box>
+
+			{/* メインコンテンツ */}
+			<Box
+				style={{
+					marginLeft: "var(--sidebar-width, 45px)",
+					width: "calc(100% - var(--sidebar-width, 45px))",
+					padding: "var(--space-4)",
+					transition: "margin-left 0.2s ease, width 0.2s ease",
+					backgroundColor: "#F8F6F1",
+					color: "#383838",
+				}}
+			>
+				<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
+					<Flex
+						justify="center"
+						align="center"
+						mb="4"
+						style={{ position: "relative" }}
+					>
+						<Text size="6" weight="bold">
+							{household.name} - 固定費管理
+						</Text>
+					</Flex>
+
+					<Flex direction="column" p="4">
+						<FixedExpenseSection
+							fixedList={fixedList}
+							categories={categories}
+							tags={tags}
+							members={members}
+						/>
+					</Flex>
+				</Container>
+			</Box>
+		</Flex>
 	);
 }

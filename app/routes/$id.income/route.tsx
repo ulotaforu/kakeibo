@@ -1,6 +1,5 @@
 import type { Route } from "./+types/route";
 import {
-	Link,
 	useLoaderData,
 	Form,
 	useActionData,
@@ -17,12 +16,13 @@ import {
 } from "server/db/schema";
 import { eq, and } from "drizzle-orm";
 import {
-	Button,
 	Container,
 	Flex,
 	Text,
+	Box,
 } from "@radix-ui/themes";
 import IncomeForm from "app/components/IncomeForm";
+import { HamburgerMenu } from "~/components/HamburgerMenu";
 import { useForm } from "@conform-to/react";
 import { parseWithValibot } from "@conform-to/valibot";
 import { IncomeFormSchema } from "app/lib/validation";
@@ -77,6 +77,7 @@ export const loader = async ({
 
 	return {
 		household,
+		isOwner: userHousehold.owner,
 		categories: categories.filter(c => !c.is_expense),
 		members,
 	};
@@ -115,7 +116,7 @@ export const action = async ({
 };
 
 export default function HouseholdIncomePage() {
-	const { household, categories, members } = useLoaderData<typeof loader>();
+	const { household, isOwner, categories, members } = useLoaderData<typeof loader>();
 	const actionData = useActionData();
 	const [form, fields] = useForm({
 		lastResult: actionData,
@@ -127,40 +128,55 @@ export default function HouseholdIncomePage() {
 	});
 
 	return (
-		<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
-			<Flex
-				justify="center"
-				align="center"
-				mb="4"
-				style={{ position: "relative" }}
-			>
-				<Button
-					asChild
-					variant="ghost"
-					style={{ position: "absolute", left: 0 }}
-				>
-					<Link to={`/${household.id}`}>戻る</Link>
-				</Button>
-				<Text size="6" weight="bold">
-					{household.name} - 収入登録
-				</Text>
-			</Flex>
+		<Flex style={{ minHeight: "100vh", backgroundColor: "#F8F6F1" }}>
+			{/* サイドバー（ハンバーガーメニュー） */}
+			<Box style={{ position: "fixed", left: 0, top: 0, zIndex: 10 }}>
+				<HamburgerMenu
+					householdId={household.id}
+					isOwner={isOwner}
+				/>
+			</Box>
 
-			<Flex direction="column" p="4">
-				<Form
-					method="post"
-					id={form.id}
-					onSubmit={form.onSubmit}
-					noValidate
-					style={{ display: "contents" }}
-				>
-					<IncomeForm
-						categories={categories}
-						members={members}
-						fields={fields}
-					/>
-				</Form>
-			</Flex>
-		</Container>
+			{/* メインコンテンツ */}
+			<Box
+				style={{
+					marginLeft: "var(--sidebar-width, 45px)",
+					width: "calc(100% - var(--sidebar-width, 45px))",
+					padding: "var(--space-4)",
+					transition: "margin-left 0.2s ease, width 0.2s ease",
+					backgroundColor: "#F8F6F1",
+					color: "#383838",
+				}}
+			>
+				<Container size="3" pt="4" style={{ maxWidth: "100%" }}>
+					<Flex
+						justify="center"
+						align="center"
+						mb="4"
+						style={{ position: "relative" }}
+					>
+						<Text size="6" weight="bold">
+							{household.name} - 収入登録
+						</Text>
+					</Flex>
+
+					<Flex direction="column" p="4">
+						<Form
+							method="post"
+							id={form.id}
+							onSubmit={form.onSubmit}
+							noValidate
+							style={{ display: "contents" }}
+						>
+							<IncomeForm
+								categories={categories}
+								members={members}
+								fields={fields}
+							/>
+						</Form>
+					</Flex>
+				</Container>
+			</Box>
+		</Flex>
 	);
 }
