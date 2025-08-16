@@ -7,6 +7,7 @@ import { ExpenseIcon } from "./icons/ExpenseIcon";
 import { IncomeIcon } from "./icons/IncomeIcon";
 import { FixedCostIcon } from "./icons/FixedConstIcon";
 import { InviteIcon } from "./icons/InviteIcon";
+import { HomeIcon } from "./icons/HomeIcon";
 
 interface HamburgerMenuProps {
 	householdId: string;
@@ -32,6 +33,12 @@ export function HamburgerMenu({
 	const iconColor = "#F8F6F1"; // 勝色背景に対しては白色を維持
 
 	const menuItems = [
+		{
+			path: "/home",
+			label: "ホーム",
+			icon: <HomeIcon color={iconColor} />,
+			ownerItem: false,
+		},
 		{
 			path: `/${householdId}`,
 			label: "ダッシュボード",
