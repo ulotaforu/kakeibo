@@ -1,6 +1,7 @@
 import type { Route } from "./+types/route";
 import {
 	useLoaderData,
+	useActionData,
 } from "react-router";
 import { checkUser } from "~/lib/auth/session";
 import { redirect } from "react-router";
@@ -15,6 +16,8 @@ import {
 	fixedExpensesTable,
 } from "server/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { parseWithValibot } from "@conform-to/valibot";
+import { FixedExpenseFormSchema } from "~/lib/validation";
 import {
 	Container,
 	Flex,
@@ -134,6 +137,60 @@ export const loader = async ({
 		members,
 		fixedList,
 	};
+};
+
+export const action = async ({
+	request,
+	params,
+	context,
+}: Route.ActionArgs) => {
+	const user = await checkUser(context.hono.context);
+	if (user.state !== "authenticated") {
+		return redirect("/signin");
+	}
+
+	const db = drizzle(context.cloudflare.env.DB);
+
+	// ユーザーが家計簿のメンバーかチェック
+	const userHousehold = await db
+		.select({ owner: householdUsersTable.owner })
+		.from(householdUsersTable)
+		.where(
+			and(
+				eq(householdUsersTable.user_id, user.userId),
+				eq(householdUsersTable.household_id, params.id),
+			),
+		)
+		.get();
+
+	if (!userHousehold) throw new Response("Forbidden", { status: 403 });
+
+	const formData = await request.formData();
+	const submission = parseWithValibot(formData, { schema: FixedExpenseFormSchema });
+
+	if (submission.status !== "success") {
+		return submission.reply();
+	}
+
+	const { amount, category_id, tag_id, note, payer } = submission.value;
+
+	try {
+		await db.insert(fixedExpensesTable).values({
+			household_id: params.id,
+			amount,
+			category_id,
+			tag_id,
+			note: note || null,
+			payer,
+		});
+
+		return redirect(`/${params.id}/fixed`);
+	} catch (error) {
+		console.error("固定費の登録に失敗しました:", error);
+		return submission.reply({
+			formErrors: ["固定費の登録に失敗しました"],
+		});
+	}
 };
 
 export default function HouseholdFixedPage() {

@@ -9,6 +9,10 @@ import {
 	TextField,
 } from "@radix-ui/themes";
 import { PlusIcon } from "@radix-ui/react-icons";
+import { Form, useActionData } from "react-router";
+import { useForm } from "@conform-to/react";
+import { parseWithValibot } from "@conform-to/valibot";
+import { FixedExpenseFormSchema } from "~/lib/validation";
 
 type FixedItem = {
 	id: string;
@@ -31,6 +35,15 @@ export default function FixedExpenseSection({
 	tags,
 	members,
 }: FixedExpenseSectionProps) {
+	const actionData = useActionData();
+	const [form, fields] = useForm({
+		lastResult: actionData,
+		shouldValidate: "onSubmit",
+		shouldRevalidate: "onSubmit",
+		onValidate({ formData }) {
+			return parseWithValibot(formData, { schema: FixedExpenseFormSchema });
+		},
+	});
 	return (
 		<>
 			<Flex direction="column" gap="4">
@@ -108,81 +121,138 @@ export default function FixedExpenseSection({
 					</Dialog.Trigger>
 					<Dialog.Content style={{ padding: "var(--space-4)", width: 400 }}>
 						<Dialog.Title mb="3">固定費を登録</Dialog.Title>
-						<Flex direction="column" gap="3">
-							{/* カテゴリ */}
-							<Flex direction="column" gap="1">
-								<Text size="2">カテゴリ</Text>
-								<Select.Root
-									name="category_id"
-									defaultValue={categories[0]?.id}
-								>
-									<Select.Trigger />
-									<Select.Content>
-										{categories
-											.filter((c) => c.is_expense)
-											.map((c) => (
-												<Select.Item key={c.id} value={c.id}>
-													{c.name}
+						<Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate={form.noValidate}>
+							<Flex direction="column" gap="3">
+								{/* フォームエラー表示 */}
+								{form.errors && (
+									<Flex direction="column" gap="1">
+										{form.errors.map((error) => (
+											<Text key={error} color="red" size="2">
+												{error}
+											</Text>
+										))}
+									</Flex>
+								)}
+
+								{/* カテゴリ */}
+								<Flex direction="column" gap="1">
+									<Text size="2">カテゴリ</Text>
+									<Select.Root
+										key={fields.category_id.key}
+										name={fields.category_id.name}
+										defaultValue={categories.filter(c => c.is_expense)[0]?.id}
+									>
+										<Select.Trigger />
+										<Select.Content>
+											{categories
+												.filter((c) => c.is_expense)
+												.map((c) => (
+													<Select.Item key={c.id} value={c.id}>
+														{c.name}
+													</Select.Item>
+												))}
+										</Select.Content>
+									</Select.Root>
+									{fields.category_id.errors && (
+										<Text color="red" size="1">
+											{fields.category_id.errors}
+										</Text>
+									)}
+								</Flex>
+
+								{/* 金額 */}
+								<Flex direction="column" gap="1">
+									<Text size="2">金額</Text>
+									<TextField.Root
+										key={fields.amount.key}
+										name={fields.amount.name}
+										type="number"
+										inputMode="numeric"
+										pattern="[0-9]*"
+										placeholder="金額を入力"
+									/>
+									{fields.amount.errors && (
+										<Text color="red" size="1">
+											{fields.amount.errors}
+										</Text>
+									)}
+								</Flex>
+
+								{/* タグ */}
+								<Flex direction="column" gap="1">
+									<Text size="2">タグ</Text>
+									<Select.Root
+										key={fields.tag_id.key}
+										name={fields.tag_id.name}
+										defaultValue={tags[0]?.id}
+									>
+										<Select.Trigger />
+										<Select.Content>
+											{tags.map((t) => (
+												<Select.Item key={t.id} value={t.id}>
+													{t.name}
 												</Select.Item>
 											))}
-									</Select.Content>
-								</Select.Root>
-							</Flex>
+										</Select.Content>
+									</Select.Root>
+									{fields.tag_id.errors && (
+										<Text color="red" size="1">
+											{fields.tag_id.errors}
+										</Text>
+									)}
+								</Flex>
 
-							{/* 金額 */}
-							<Flex direction="column" gap="1">
-								<Text size="2">金額</Text>
-								<TextField.Root
-									type="number"
-									inputMode="numeric"
-									pattern="[0-9]*"
-									placeholder="金額を入力"
-									name="amount"
-								/>
-							</Flex>
+								{/* メモ */}
+								<Flex direction="column" gap="1">
+									<Text size="2">メモ</Text>
+									<TextField.Root
+										key={fields.note.key}
+										name={fields.note.name}
+										placeholder="メモ"
+									/>
+									{fields.note.errors && (
+										<Text color="red" size="1">
+											{fields.note.errors}
+										</Text>
+									)}
+								</Flex>
 
-							{/* タグ */}
-							<Flex direction="column" gap="1">
-								<Text size="2">タグ</Text>
-								<Select.Root name="tag_id" defaultValue={tags[0]?.id}>
-									<Select.Trigger />
-									<Select.Content>
-										{tags.map((t) => (
-											<Select.Item key={t.id} value={t.id}>
-												{t.name}
-											</Select.Item>
-										))}
-									</Select.Content>
-								</Select.Root>
-							</Flex>
+								{/* 支払者 */}
+								<Flex direction="column" gap="1">
+									<Text size="2">支払者</Text>
+									<Select.Root
+										key={fields.payer.key}
+										name={fields.payer.name}
+										defaultValue={members[0]?.id}
+									>
+										<Select.Trigger />
+										<Select.Content>
+											{members.map((m) => (
+												<Select.Item key={m.id} value={m.id}>
+													{m.name}
+												</Select.Item>
+											))}
+										</Select.Content>
+									</Select.Root>
+									{fields.payer.errors && (
+										<Text color="red" size="1">
+											{fields.payer.errors}
+										</Text>
+									)}
+								</Flex>
 
-							{/* メモ */}
-							<Flex direction="column" gap="1">
-								<Text size="2">メモ</Text>
-								<TextField.Root name="note" placeholder="メモ" />
+								<Flex justify="end" gap="2" mt="3">
+									<Dialog.Close>
+										<Button type="button" variant="soft">
+											キャンセル
+										</Button>
+									</Dialog.Close>
+									<Button type="submit" variant="solid">
+										<PlusIcon /> 登録
+									</Button>
+								</Flex>
 							</Flex>
-
-							{/* 支払者 */}
-							<Flex direction="column" gap="1">
-								<Text size="2">支払者</Text>
-								<Select.Root name="payer" defaultValue={members[0]?.id}>
-									<Select.Trigger />
-									<Select.Content>
-										{members.map((m) => (
-											<Select.Item key={m.id} value={m.id}>
-												{m.name}
-											</Select.Item>
-										))}
-									</Select.Content>
-								</Select.Root>
-							</Flex>
-
-							<Flex justify="end" gap="2" mt="3">
-								<Button type="submit" variant="solid">
-									<PlusIcon /> 登録
-								</Button>
-							</Flex>
-						</Flex>
+						</Form>
 					</Dialog.Content>
 				</Dialog.Root>
 			</Flex>

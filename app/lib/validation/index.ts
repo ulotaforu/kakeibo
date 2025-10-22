@@ -74,3 +74,18 @@ export const InviteFormSchema = object({
 		nonEmpty(InviteFormMessages.invitee_email.empty),
 	),
 });
+
+export const FixedExpenseFormMessages = {
+	amount: "金額を入力してください",
+	category_id: "カテゴリを選択してください",
+	tag_id: "タグを選択してください",
+	payer: "支払者を選択してください",
+};
+export const FixedExpenseFormSchema = object({
+	amount: pipe(number(FixedExpenseFormMessages.amount)),
+	category_id: pipe(string(FixedExpenseFormMessages.category_id)),
+	tag_id: pipe(string(FixedExpenseFormMessages.tag_id)),
+	note: optional(string()),
+	payer: pipe(string(FixedExpenseFormMessages.payer)),
+});
+
