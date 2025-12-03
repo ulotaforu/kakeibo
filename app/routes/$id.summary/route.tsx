@@ -68,7 +68,7 @@ export const loader = async ({
 	const ymPrefix = `${ym}%`;
 
 	// 支出と収入の明細を取得
-	const [detailExpenses, detailIncomes] = await Promise.all([
+	const [expenses, incomes] = await Promise.all([
 		db
 			.select({
 				id: expensesTable.id,
@@ -116,6 +116,25 @@ export const loader = async ({
 			)
 			.orderBy(desc(incomesTable.received_at), desc(incomesTable.id)),
 	]);
+	const detailExpenses = expenses.map((e) => ({
+		id: e.id,
+		amount: e.amount,
+		note: e.note,
+		date: e.date,
+		categoryName: e.categoryName,
+		tagName: e.tagName,
+		userName: e.userName,
+		isExpense: true,
+	}));
+	const detailIncomes = incomes.map((e) => ({
+		id: e.id,
+		amount: e.amount,
+		note: e.note,
+		date: e.date,
+		categoryName: e.categoryName,
+		userName: e.userName,
+		isExpense: false,
+	}));
 
 	// 総支出を計算
 	const expenseTotal = detailExpenses.reduce((sum, e) => sum + e.amount, 0);
@@ -241,6 +260,7 @@ export default function HouseholdSummaryPage() {
 							<SummaryTable
 								expenses={currentDetailExpenses ?? []}
 								incomes={currentDetailIncomes ?? []}
+								householdId={household.id}
 							/>
 						</Box>
 					</Flex>

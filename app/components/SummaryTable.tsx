@@ -1,5 +1,6 @@
 import { Box, IconButton, Table, Text } from "@radix-ui/themes";
-// import { Pencil1Icon } from "@radix-ui/react-icons";
+import { Pencil1Icon } from "@radix-ui/react-icons";
+import { useNavigate } from "react-router";
 
 interface SummaryTableProps {
 	expenses: Array<{
@@ -10,6 +11,7 @@ interface SummaryTableProps {
 		categoryName: string;
 		tagName: string | null;
 		userName: string;
+		isExpense: boolean;
 	}>;
 	incomes: Array<{
 		id: string;
@@ -18,13 +20,21 @@ interface SummaryTableProps {
 		date: string;
 		categoryName: string;
 		userName: string;
+		isExpense: boolean;
 	}>;
+	householdId: string;
 }
 
-export function SummaryTable({ expenses, incomes }: SummaryTableProps) {
+export function SummaryTable({
+	expenses,
+	incomes,
+	householdId,
+}: SummaryTableProps) {
 	const summary = [...expenses, ...incomes].sort(
 		(a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
 	);
+	const navigate = useNavigate();
+
 	return (
 		<Box style={{ overflowX: "auto" }}>
 			<Table.Root variant="surface">
@@ -36,7 +46,7 @@ export function SummaryTable({ expenses, incomes }: SummaryTableProps) {
 						{/* <Table.ColumnHeaderCell>タグ</Table.ColumnHeaderCell> */}
 						<Table.ColumnHeaderCell>ユーザー</Table.ColumnHeaderCell>
 						<Table.ColumnHeaderCell>メモ</Table.ColumnHeaderCell>
-						{/* <Table.ColumnHeaderCell>編集</Table.ColumnHeaderCell> */}
+						<Table.ColumnHeaderCell>編集</Table.ColumnHeaderCell>
 					</Table.Row>
 				</Table.Header>
 				<Table.Body>
@@ -77,16 +87,21 @@ export function SummaryTable({ expenses, incomes }: SummaryTableProps) {
 									{item.note || "-"}
 								</Text>
 							</Table.Cell>
-							{/* <Table.Cell>
+							<Table.Cell>
 								<IconButton
 									variant="ghost"
 									size="1"
-									// TODO: 編集用のページに遷移させる
-									onClick={() => onEditExpense(expense)}
+									onClick={() =>
+										navigate(
+											`/${householdId}/edit/${
+												item.isExpense ? "expenses" : "incomes"
+											}/${item.id}`,
+										)
+									}
 								>
 									<Pencil1Icon />
 								</IconButton>
-							</Table.Cell> */}
+							</Table.Cell>
 						</Table.Row>
 					))}
 				</Table.Body>
