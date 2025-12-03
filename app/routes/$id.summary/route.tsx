@@ -228,6 +228,11 @@ export default function HouseholdSummaryPage() {
 											if (pageInput) pageInput.value = "1";
 											form.requestSubmit();
 										}
+										history.replaceState(
+											null,
+											"",
+											`/${household.id}/summary?ym=${e.currentTarget.value}`,
+										);
 									}}
 									style={{ width: "140px", padding: "var(--space-1)" }}
 									max={new Date().toISOString().slice(0, 7)}

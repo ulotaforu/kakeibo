@@ -17,6 +17,10 @@ interface HamburgerMenuProps {
 
 type MenuDisplay = "icon" | "iconText";
 
+const year = new Date().getFullYear();
+const month = new Date().getMonth() + 1;
+const ym = `${year}-${String(month).padStart(2, "0")}`;
+
 export function HamburgerMenu({
 	householdId,
 	isOwner,
@@ -46,7 +50,7 @@ export function HamburgerMenu({
 			ownerItem: false,
 		},
 		{
-			path: `/${householdId}/summary`,
+			path: `/${householdId}/summary?ym=${ym}`,
 			label: "明細",
 			icon: <StatementIcon color={iconColor} />,
 			ownerItem: false,
